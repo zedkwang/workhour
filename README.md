@@ -4,14 +4,13 @@
 
 ## Cloudflare Pages 배포
 
-이 저장소는 Cloudflare Pages의 Git 연동(Git Integration) 배포를 기준으로 구성되어 있습니다.
+별도 빌드 과정이 없는 정적 HTML 사이트입니다. 루트의 `index.html`을 Cloudflare Pages에 직접 배포합니다.
 
-1. Cloudflare 대시보드에서 **Workers & Pages → Create application → Pages → Import an existing Git repository**를 선택합니다.
-2. `zed367/workhour` 저장소를 연결합니다.
-3. 아래 값으로 빌드 설정을 입력합니다.
-   - Production branch: `main`
-   - Build command: `exit 0`
-   - Build output directory: `.`
-4. 배포를 시작합니다.
+```bash
+npx wrangler pages project create workhour --production-branch main
+npx wrangler pages deploy . --project-name workhour --branch main
+```
 
-루트의 `index.html`이 배포 대상이므로 별도 빌드 과정이 필요하지 않습니다. 연결 후 `main` 브랜치 푸시는 프로덕션에 자동 배포되고, Pull Request에는 미리보기 배포가 생성됩니다.
+이후 변경사항을 배포할 때는 두 번째 명령만 다시 실행하면 됩니다.
+
+> Direct Upload 프로젝트는 Cloudflare 대시보드의 기본 Git 연동으로 나중에 전환할 수 없습니다. Git 푸시마다 Cloudflare가 자동 배포하도록 하려면, 처음부터 Cloudflare 대시보드에서 **Pages → Import an existing Git repository**로 `zed367/workhour`를 연결해 별도 Git 연동 프로젝트를 만들어야 합니다. 이 경우 Build command는 `exit 0`, Build output directory는 `.`으로 설정합니다.
