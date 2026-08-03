@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>월 소정근무 시간 계산기</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #000000;
+      color: #f2f2f7;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 780px;
+      margin: 0 auto;
+      padding: 32px 20px 60px;
+    }
+
+    .page-title   { font-size: 26px; font-weight: 700; margin-bottom: 8px; }
+    .page-subtitle { font-size: 14px; color: #636366; margin-bottom: 28px; }
+
+    /* ── 카드 ── */
+    .card {
+      background: #1c1c1e;
+      border-radius: 18px;
+      padding: 24px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.4), 0 4px 16px rgba(0,0,0,.3);
+    }
+
+    .card-title {
+      font-size: 13px; font-weight: 600;
+      color: #636366; text-transform: uppercase;
+      letter-spacing: .5px; margin-bottom: 16px;
+    }
+
+    /* ── 컨트롤 ── */
+    .controls { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; }
+    .ctrl-group { display: flex; flex-direction: column; gap: 6px; }
+    .ctrl-group label { font-size: 12px; font-weight: 600; color: #636366; }
+
+    select, input[type="number"] {
+      padding: 10px 14px;
+      border: 1.5px solid #3a3a3c;
+      border-radius: 10px;
+      font-size: 15px;
+      color: #f2f2f7;
+      background: #2c2c2e;
+      outline: none;
+      transition: border-color .2s;
+      -webkit-appearance: none;
+    }
+    select:focus, input[type="number"]:focus { border-color: #0a84ff; }
+    input[type="number"] { width: 160px; }
+
+    .toggle-group { min-width: 180px; padding-bottom: 4px; }
+    .toggle-label {
+      display: flex; align-items: center; gap: 9px;
+      color: #f2f2f7 !important; cursor: pointer;
+      font-size: 14px !important; font-weight: 500 !important;
+    }
+    .toggle-label input { position: absolute; opacity: 0; pointer-events: none; }
+    .toggle-ui {
+      width: 42px; height: 24px; border-radius: 999px;
+      background: #3a3a3c; position: relative; transition: background .2s;
+    }
+    .toggle-ui::after {
+      content: ''; position: absolute; width: 18px; height: 18px;
+      left: 3px; top: 3px; border-radius: 50%; background: #fff;
+      transition: transform .2s;
+    }
+    .toggle-label input:checked + .toggle-ui { background: #0a84ff; }
+    .toggle-label input:checked + .toggle-ui::after { transform: translateX(18px); }
+    .control-hint { font-size: 11px; color: #636366; line-height: 1.45; max-width: 220px; }
+
+    /* ── 요약 ── */
+    .summary-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; }
+
+    .stat-box {
+      background: #2c2c2e; border-radius: 14px;
+      padding: 18px 14px; text-align: center;
+    }
+    .stat-value { font-size: 32px; font-weight: 700; color: #0a84ff; line-height: 1; }
+    .stat-unit  { font-size: 14px; font-weight: 500; color: #0a84ff; margin-top: 2px; }
+    .stat-label { font-size: 12px; color: #636366; margin-top: 6px; line-height: 1.4; }
+    .stat-box.highlight .stat-value,
+    .stat-box.highlight .stat-unit { color: #30d158; }
+    .stat-box.warning .stat-value,
+    .stat-box.warning .stat-unit { color: #ff9f0a; }
+    .stat-value.stat-duration { font-size: 22px; line-height: 1.15; }
+    .formula-note {
+      margin-top: 14px; padding: 11px 13px; border-radius: 10px;
+      background: #242426; color: #8e8e93; font-size: 12px; line-height: 1.6;
+    }
+    .progress-note { color: #aeaeb2; }
+
+    /* ── 달력 헤더 ── */
+    .cal-header {
+      display: flex; justify-content: space-between;
+      align-items: center; margin-bottom: 16px;
+    }
+    .cal-month-title { font-size: 20px; font-weight: 700; }
+    .cal-nav { display: flex; gap: 8px; }
+    .cal-nav button {
+      background: #2c2c2e; border: none; border-radius: 8px;
+      padding: 6px 12px; font-size: 16px; cursor: pointer;
+      color: #0a84ff; transition: background .15s;
+    }
+    .cal-nav button:hover { background: #3a3a3c; }
+
+    /* ── 달력 테이블 ── */
+    table.cal { width: 100%; border-collapse: separate; border-spacing: 3px; }
+    table.cal thead th {
+      text-align: center; font-size: 12px; font-weight: 600;
+      color: #636366; padding: 6px 2px;
+    }
+    table.cal thead th:first-child { color: #ff453a; }
+    table.cal thead th:last-child  { color: #0a84ff; }
+
+    table.cal tbody td {
+      text-align: center; vertical-align: top;
+      width: 14.28%; height: 72px;
+      border-radius: 12px; padding: 8px 4px 6px;
+      position: relative; cursor: pointer;
+      transition: filter .12s;
+    }
+    table.cal tbody td:hover:not(.t-empty) { filter: brightness(1.15); }
+
+    .dn { display: block; font-size: 16px; font-weight: 500; line-height: 1; }
+    .hn { display: block; font-size: 9px; margin-top: 3px; color: #ff453a; line-height: 1.3; word-break: keep-all; }
+    .hh { display: block; font-size: 10px; font-weight: 700; margin-top: 4px; color: #0a84ff; }
+
+    /* 날짜 상태 */
+    td.t-empty   { background: transparent; pointer-events: none; }
+    td.t-workday { background: #2c2c2e; }
+    td.t-sun     { background: #2d1a1a; }
+    td.t-sun .dn { color: #ff453a; }
+    td.t-sat     { background: #1a1e2d; }
+    td.t-sat .dn { color: #0a84ff; }
+    td.t-holiday { background: #3a1616; }
+    td.t-holiday .dn { color: #ff453a; font-weight: 700; }
+    td.t-holiday .hn { color: #ff6b6b; }
+
+    /* 사용자 지정 공휴일 */
+    td.t-custom  { background: #2d2010; }
+    td.t-custom .dn { color: #ff9f0a; font-weight: 700; }
+    td.t-custom .hn { color: #ff9f0a; }
+
+    td.t-today::after {
+      content: ''; display: block;
+      width: 5px; height: 5px;
+      background: #0a84ff; border-radius: 50%;
+      margin: 2px auto 0;
+    }
+    td.t-today > .dn { font-weight: 800; }
+
+    /* ── 범례 ── */
+    .legend { display: flex; gap: 16px; margin-top: 16px; flex-wrap: wrap; }
+    .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #636366; }
+    .lg-dot { width: 13px; height: 13px; border-radius: 5px; flex-shrink: 0; }
+    .lg-workday { background: #2c2c2e; border: 1.5px solid #3a3a3c; }
+    .lg-holiday { background: #3a1616; border: 1.5px solid #5a2020; }
+    .lg-custom  { background: #2d2010; border: 1.5px solid #5a4010; }
+    .lg-sat     { background: #1a1e2d; border: 1.5px solid #2a304d; }
+    .lg-sun     { background: #2d1a1a; border: 1.5px solid #4d2a2a; }
+
+    .legend-hint {
+      font-size: 11px; color: #48484a; margin-top: 8px;
+      display: flex; align-items: center; gap: 5px;
+    }
+
+    /* ── 공휴일 목록 ── */
+    .holiday-list {
+      margin-top: 20px; background: #2c2c2e;
+      border-radius: 14px; padding: 16px;
+    }
+    .holiday-list h3 { font-size: 13px; font-weight: 600; color: #aeaeb2; margin-bottom: 10px; }
+
+    .hol-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 7px 0; border-bottom: 1px solid #3a3a3c; font-size: 13px;
+    }
+    .hol-row:last-child { border-bottom: none; }
+    .hol-date { font-weight: 700; color: #ff453a; min-width: 75px; }
+    .hol-date.custom-date { color: #ff9f0a; }
+    .hol-dow  { color: #636366; font-size: 11px; min-width: 20px; }
+    .hol-name { color: #f2f2f7; flex: 1; }
+
+    .badge {
+      font-size: 10px; padding: 2px 7px;
+      border-radius: 6px; white-space: nowrap;
+    }
+    .badge-temp   { background: #3a2d00; color: #ffd60a; }
+    .badge-sub    { background: #001a3a; color: #0a84ff; }
+    .badge-custom { background: #3a2500; color: #ff9f0a; }
+
+    .btn-del-custom {
+      background: none; border: none; cursor: pointer;
+      color: #48484a; font-size: 14px; padding: 2px 4px;
+      border-radius: 4px; transition: color .15s;
+    }
+    .btn-del-custom:hover { color: #ff453a; }
+
+    .no-holiday { color: #636366; font-size: 13px; padding: 8px 0; }
+
+    /* ── 휴가 ── */
+    td.t-vacation { background: #1a2d1e; }
+    td.t-vacation .dn { color: #30d158; font-weight: 700; }
+    td.t-vacation .hn { color: #30d158; }
+    .lg-vacation  { background: #1a2d1e; border: 1.5px solid #2a4d30; }
+    .modal-status.vacation { background: #1a2d1e; color: #30d158; }
+    .stat-box.vacation .stat-value,
+    .stat-box.vacation .stat-unit { color: #ff9f0a; }
+    .btn-vacation { background: #30d158; color: #fff; }
+    .modal-vac-divider {
+      text-align: center; font-size: 11px; color: #48484a;
+      margin: 10px 0; padding-top: 12px; border-top: 1px solid #3a3a3c;
+    }
+
+    /* 마지막 근무일 휴무 예정 */
+    td.t-last-day-off { background: #20202b; }
+    td.t-last-day-off .dn { color: #bf5af2; font-weight: 700; }
+    td.t-last-day-off .hn { color: #bf5af2; }
+    .lg-last-day-off { background: #20202b; border: 1.5px solid #59306d; }
+
+    /* ── 모달 ── */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.7); z-index: 100;
+      align-items: center; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+
+    .modal {
+      background: #1c1c1e; border-radius: 20px;
+      padding: 28px 24px; width: 320px; max-width: 90vw;
+      box-shadow: 0 8px 40px rgba(0,0,0,.6);
+      animation: pop .18s ease;
+      border: 1px solid #3a3a3c;
+    }
+    @keyframes pop { from { transform: scale(.92); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+    .modal-date-label { font-size: 13px; color: #636366; margin-bottom: 4px; }
+    .modal-date-value { font-size: 22px; font-weight: 700; color: #f2f2f7; margin-bottom: 18px; }
+
+    .modal-status {
+      font-size: 13px; padding: 8px 12px;
+      border-radius: 8px; margin-bottom: 18px;
+    }
+    .modal-status.official { background: #3a1616; color: #ff6b6b; }
+    .modal-status.workday  { background: #2c2c2e; color: #aeaeb2; border: 1px solid #3a3a3c; }
+    .modal-status.custom   { background: #2d2010; color: #ff9f0a; }
+    .modal-status.weekend  { background: #2c2c2e; color: #636366; border: 1px solid #3a3a3c; }
+
+    .modal-input-label { font-size: 12px; font-weight: 600; color: #636366; margin-bottom: 6px; }
+    .modal-input {
+      width: 100%; padding: 10px 12px;
+      border: 1.5px solid #3a3a3c; border-radius: 10px;
+      font-size: 14px; color: #f2f2f7;
+      background: #2c2c2e; outline: none;
+      transition: border-color .2s; margin-bottom: 18px;
+    }
+    .modal-input:focus { border-color: #0a84ff; }
+    .modal-input::placeholder { color: #48484a; }
+
+    .modal-btns { display: flex; gap: 8px; }
+
+    .btn {
+      flex: 1; padding: 11px 0; border: none; border-radius: 10px;
+      font-size: 14px; font-weight: 600; cursor: pointer; transition: opacity .15s;
+    }
+    .btn:hover { opacity: .85; }
+    .btn-cancel  { background: #3a3a3c; color: #aeaeb2; }
+    .btn-add     { background: #0a84ff; color: #fff; }
+    .btn-remove  { background: #ff453a; color: #fff; }
+
+    /* 푸터 */
+    .footer-note {
+      font-size: 12px; color: #48484a;
+      margin-top: 20px; text-align: center; line-height: 1.7;
+    }
+
+    @media (max-width: 540px) {
+      .summary-grid { grid-template-columns: repeat(2,1fr); gap: 8px; }
+      .stat-value   { font-size: 24px; }
+      table.cal tbody td { height: 58px; }
+      .dn { font-size: 13px; }
+      .hh, .hn { font-size: 8px; }
+      .stat-value.stat-duration { font-size: 18px; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <h1 class="page-title">월 소정근무 시간 계산기</h1>
+  <p class="page-subtitle">한국 공휴일 · 대체공휴일 · 임시공휴일 반영 (2026~2027년)</p>
+
+  <!-- 컨트롤 -->
+  <div class="card">
+    <div class="card-title">조회 설정</div>
+    <div class="controls">
+      <div class="ctrl-group">
+        <label>연도</label>
+        <select id="sel-year">
+          <option value="2026">2026년</option>
+          <option value="2027">2027년</option>
+        </select>
+      </div>
+      <div class="ctrl-group">
+        <label>월</label>
+        <select id="sel-month"></select>
+      </div>
+      <div class="ctrl-group">
+        <label for="inp-reference-day">계산 기준일</label>
+        <input type="number" id="inp-reference-day" min="1" max="31" step="1">
+      </div>
+      <div class="ctrl-group">
+        <label for="inp-worked-hours">기준일까지 누적 근무시간 (h)</label>
+        <input type="number" id="inp-worked-hours" min="0" max="744" step="0.25" placeholder="예: 82.5">
+        <span class="control-hint">오늘 근무한 시간까지 포함한 누적값을 입력해 주세요.</span>
+      </div>
+      <div class="ctrl-group toggle-group">
+        <label class="toggle-label" for="inp-last-day-off">
+          <input type="checkbox" id="inp-last-day-off">
+          <span class="toggle-ui" aria-hidden="true"></span>
+          마지막 근무일 쉬기
+        </label>
+        <span class="control-hint">마지막 가능한 근무일을 제외하고 남은 시간을 나눕니다.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 요약 -->
+  <div class="card">
+    <div class="card-title">이달 근무 요약</div>
+    <div class="summary-grid">
+      <div class="stat-box">
+        <div class="stat-value stat-duration" id="s-target">-</div>
+        <div class="stat-unit">월 기준시간</div>
+        <div class="stat-label">공식 자동 계산</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-value" id="s-weekday-holidays">-</div>
+        <div class="stat-unit">일</div>
+        <div class="stat-label">평일 공휴일</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-value" id="s-working">-</div>
+        <div class="stat-unit">일</div>
+        <div class="stat-label">전체 근무 가능일</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-value" id="s-remaining-days">-</div>
+        <div class="stat-unit">일</div>
+        <div class="stat-label">남은 근무 가능일</div>
+      </div>
+      <div class="stat-box warning">
+        <div class="stat-value stat-duration" id="s-remaining-hours">-</div>
+        <div class="stat-unit">남은 시간</div>
+        <div class="stat-label">누적 근무시간 반영</div>
+      </div>
+      <div class="stat-box highlight">
+        <div class="stat-value stat-duration" id="s-daily-required">-</div>
+        <div class="stat-unit">시간</div>
+        <div class="stat-label">남은 근무일당 추가 필요</div>
+      </div>
+    </div>
+    <p class="formula-note" id="formula-note"></p>
+    <p class="formula-note progress-note" id="progress-note"></p>
+  </div>
+
+  <!-- 달력 -->
+  <div class="card">
+    <div class="cal-header">
+      <div class="cal-month-title" id="cal-title"></div>
+      <div class="cal-nav">
+        <button id="btn-prev">&#8249;</button>
+        <button id="btn-next">&#8250;</button>
+      </div>
+    </div>
+
+    <table class="cal">
+      <thead>
+        <tr><th>일</th><th>월</th><th>화</th><th>수</th><th>목</th><th>금</th><th>토</th></tr>
+      </thead>
+      <tbody id="cal-body"></tbody>
+    </table>
+
+    <div class="legend">
+      <div class="legend-item"><div class="lg-dot lg-workday"></div> 근무일</div>
+      <div class="legend-item"><div class="lg-dot lg-holiday"></div> 공휴일</div>
+      <div class="legend-item"><div class="lg-dot lg-custom"></div> 지정 공휴일</div>
+      <div class="legend-item"><div class="lg-dot lg-sun"></div> 일요일</div>
+      <div class="legend-item"><div class="lg-dot lg-sat"></div> 토요일</div>
+      <div class="legend-item" style="color:#007aff;font-weight:600;">🔵 남은 근무일당 추가 필요</div>
+      <div class="legend-item"><div class="lg-dot lg-vacation"></div> 휴가</div>
+      <div class="legend-item"><div class="lg-dot lg-last-day-off"></div> 마지막 근무일 휴무</div>
+    </div>
+    <div class="legend-hint">✏️ 날짜를 클릭하면 공휴일로 지정하거나 해제할 수 있습니다</div>
+
+    <div class="holiday-list">
+      <h3 id="hol-list-title">이달의 공휴일</h3>
+      <div id="hol-list-body"></div>
+    </div>
+
+    <div class="holiday-list" id="vac-list-wrap" style="display:none;margin-top:12px">
+      <h3 id="vac-list-title">이달의 휴가</h3>
+      <div id="vac-list-body"></div>
+    </div>
+  </div>
+
+  <p class="footer-note">
+    ※ 법정 공휴일·대체공휴일·임시공휴일(2026 지방선거) 기준 | 현충일은 대체공휴일 미적용<br>
+    ※ 음력 공휴일(설날·추석·석가탄신일)은 한국천문연구원 기준 적용
+  </p>
+</div>
+
+<!-- 공휴일 지정 모달 -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-date-label">선택한 날짜</div>
+    <div class="modal-date-value" id="modal-date"></div>
+    <div class="modal-status" id="modal-status"></div>
+
+    <div id="modal-input-wrap">
+      <div class="modal-input-label">공휴일 이름 입력</div>
+      <input class="modal-input" id="modal-inp" type="text" placeholder="예: 임시공휴일, 선거일…" maxlength="20">
+    </div>
+
+    <div class="modal-btns" id="modal-btns"></div>
+
+    <div id="modal-vac-wrap" style="display:none">
+      <div class="modal-vac-divider">또는</div>
+      <button class="btn btn-vacation" id="modal-vac-btn" style="width:100%">🏖️ 휴가로 등록</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ===================================================
+   법정 공휴일 데이터
+   현충일(6/6)은 「관공서의 공휴일에 관한 규정」상
+   대체공휴일 적용 대상이 아니므로 제외
+=================================================== */
+const HOLIDAYS = {
+  /* ---- 2026년 ---- */
+  '2026-01-01': { name: '신정',             type: 'official'  },
+  '2026-02-16': { name: '설날 전날',        type: 'official'  },
+  '2026-02-17': { name: '설날',             type: 'official'  },
+  '2026-02-18': { name: '설날 다음날',      type: 'official'  },
+  '2026-03-01': { name: '삼일절',           type: 'official'  },  // 일
+  '2026-03-02': { name: '대체공휴일',       type: 'substitute'},  // 월 (삼일절 일→월)
+  '2026-05-05': { name: '어린이날',         type: 'official'  },
+  '2026-05-24': { name: '석가탄신일',       type: 'official'  },  // 일
+  '2026-05-25': { name: '대체공휴일',       type: 'substitute'},  // 월 (석가탄신일 일→월)
+  '2026-06-03': { name: '전국동시지방선거', type: 'temporary' },  // 임시공휴일
+  '2026-06-06': { name: '현충일',           type: 'official'  },  // 토 (대체공휴일 미적용)
+  '2026-08-15': { name: '광복절',           type: 'official'  },  // 토
+  '2026-08-17': { name: '대체공휴일',       type: 'substitute'},  // 월 (광복절 토→월)
+  '2026-09-24': { name: '추석 전날',        type: 'official'  },
+  '2026-09-25': { name: '추석',             type: 'official'  },
+  '2026-09-26': { name: '추석 다음날',      type: 'official'  },  // 토
+  '2026-09-28': { name: '대체공휴일',       type: 'substitute'},  // 월 (추석다음날 토→월)
+  '2026-10-03': { name: '개천절',           type: 'official'  },  // 토
+  '2026-10-05': { name: '대체공휴일',       type: 'substitute'},  // 월 (개천절 토→월)
+  '2026-10-09': { name: '한글날',           type: 'official'  },
+  '2026-12-25': { name: '크리스마스',       type: 'official'  },
+
+  /* ---- 2027년 ---- */
+  '2027-01-01': { name: '신정',             type: 'official'  },
+  '2027-02-06': { name: '설날 전날',        type: 'official'  },  // 토
+  '2027-02-07': { name: '설날',             type: 'official'  },  // 일
+  '2027-02-08': { name: '설날 다음날',      type: 'official'  },  // 월
+  '2027-02-09': { name: '대체공휴일',       type: 'substitute'},  // 화 (설날 일→화)
+  '2027-03-01': { name: '삼일절',           type: 'official'  },  // 월
+  '2027-05-05': { name: '어린이날',         type: 'official'  },
+  '2027-05-13': { name: '석가탄신일',       type: 'official'  },
+  '2027-06-06': { name: '현충일',           type: 'official'  },  // 일 (대체공휴일 미적용)
+  '2027-08-15': { name: '광복절',           type: 'official'  },  // 일
+  '2027-08-16': { name: '대체공휴일',       type: 'substitute'},  // 월 (광복절 일→월)
+  '2027-10-02': { name: '추석 전날',        type: 'official'  },  // 토
+  '2027-10-03': { name: '추석 · 개천절',   type: 'official'  },  // 일 (중복)
+  '2027-10-04': { name: '추석 다음날',      type: 'official'  },  // 월
+  '2027-10-05': { name: '대체공휴일',       type: 'substitute'},  // 화 (추석 일→화)
+  '2027-10-09': { name: '한글날',           type: 'official'  },  // 토
+  '2027-10-11': { name: '대체공휴일',       type: 'substitute'},  // 월 (한글날 토→월)
+  '2027-12-25': { name: '크리스마스',       type: 'official'  },  // 토
+  '2027-12-27': { name: '대체공휴일',       type: 'substitute'},  // 월 (크리스마스 토→월)
+};
+
+/* ===================================================
+   사용자 지정 공휴일 (localStorage 영구저장)
+=================================================== */
+const CUSTOM_KEY = 'fanding-custom-holidays';
+const WORK_PLAN_KEY = 'fanding-work-plan';
+
+function loadCustom() {
+  try { return JSON.parse(localStorage.getItem(CUSTOM_KEY)) || {}; }
+  catch { return {}; }
+}
+function saveCustom(obj) {
+  localStorage.setItem(CUSTOM_KEY, JSON.stringify(obj));
+}
+
+let customHolidays = loadCustom(); // { 'YYYY-MM-DD': '이름', ... }
+
+const VACATION_KEY = 'fanding-vacations';
+function loadVacations() {
+  try { return JSON.parse(localStorage.getItem(VACATION_KEY)) || {}; }
+  catch { return {}; }
+}
+function saveVacations(obj) { localStorage.setItem(VACATION_KEY, JSON.stringify(obj)); }
+let vacations = loadVacations(); // { 'YYYY-MM-DD': true, ... }
+
+function loadWorkPlans() {
+  try { return JSON.parse(localStorage.getItem(WORK_PLAN_KEY)) || {}; }
+  catch { return {}; }
+}
+function saveWorkPlans(obj) { localStorage.setItem(WORK_PLAN_KEY, JSON.stringify(obj)); }
+let workPlans = loadWorkPlans(); // { 'YYYY-MM': { referenceDay, workedMinutes, lastDayOff }, ... }
+
+/* ===================================================
+   날짜 유틸
+=================================================== */
+const DOW_KO = ['일','월','화','수','목','금','토'];
+
+function pad(n) { return String(n).padStart(2,'0'); }
+function key(y,m,d) { return `${y}-${pad(m)}-${pad(d)}`; }
+function daysInMonth(y,m) { return new Date(y,m,0).getDate(); }
+function dow(y,m,d)       { return new Date(y,m-1,d).getDay(); }
+
+function isOfficial(y,m,d) { return !!HOLIDAYS[key(y,m,d)]; }
+function isCustom(y,m,d)   { return !!customHolidays[key(y,m,d)]; }
+function isHoliday(y,m,d)  { return isOfficial(y,m,d) || isCustom(y,m,d); }
+function isVacation(y,m,d) { return !!vacations[key(y,m,d)]; }
+
+function vacationCount(y,m) {
+  const total = daysInMonth(y,m);
+  let cnt = 0;
+  for (let d = 1; d <= total; d++) {
+    if (isVacation(y,m,d)) cnt++;
+  }
+  return cnt;
+}
+
+function getHolName(y,m,d) {
+  return customHolidays[key(y,m,d)] || HOLIDAYS[key(y,m,d)]?.name || '';
+}
+function getHolType(y,m,d) {
+  if (customHolidays[key(y,m,d)]) return 'custom';
+  return HOLIDAYS[key(y,m,d)]?.type || '';
+}
+
+function workingDays(y,m) {
+  const total = daysInMonth(y,m);
+  let cnt = 0;
+  for (let d = 1; d <= total; d++) {
+    const w = dow(y,m,d);
+    if (w !== 0 && w !== 6 && !isHoliday(y,m,d)) cnt++;
+  }
+  return cnt;
+}
+
+function isEligibleWorkday(y,m,d) {
+  const w = dow(y,m,d);
+  return w !== 0 && w !== 6 && !isHoliday(y,m,d) && !isVacation(y,m,d);
+}
+
+function weekdayHolidayCount(y,m) {
+  let cnt = 0;
+  for (let d = 1; d <= daysInMonth(y,m); d++) {
+    const w = dow(y,m,d);
+    if (w !== 0 && w !== 6 && isHoliday(y,m,d)) cnt++;
+  }
+  return cnt;
+}
+
+function getTargetMinutes(y,m) {
+  const total = daysInMonth(y,m);
+  const fullWeeks = Math.floor(total / 7);
+  const remainderDays = total % 7;
+  const weekdayHolidays = weekdayHolidayCount(y,m);
+  return (fullWeeks * 40 * 60) + (remainderDays * (5 * 60 + 42)) - (weekdayHolidays * 8 * 60);
+}
+
+function getPlan(y,m,referenceDay,lastDayOff) {
+  const total = daysInMonth(y,m);
+  const eligibleDays = [];
+  const remainingDays = [];
+
+  for (let d = 1; d <= total; d++) {
+    if (!isEligibleWorkday(y,m,d)) continue;
+    eligibleDays.push(d);
+    if (d >= referenceDay) remainingDays.push(d);
+  }
+
+  let plannedOffKey = null;
+  if (lastDayOff && remainingDays.length) {
+    const lastDay = remainingDays.pop();
+    plannedOffKey = key(y,m,lastDay);
+  }
+
+  return { eligibleDays, remainingDays, plannedOffKey };
+}
+
+function formatMinutes(minutes) {
+  const total = Math.max(0, Math.round(minutes));
+  return `${Math.floor(total / 60)}시간 ${String(total % 60).padStart(2, '0')}분`;
+}
+
+function defaultReferenceDay(y,m) {
+  const now = new Date();
+  return now.getFullYear() === y && now.getMonth() + 1 === m ? now.getDate() : 1;
+}
+
+/* ===================================================
+   상태
+=================================================== */
+let state = { year: 2026, month: 1, referenceDay: 1, workedMinutes: 0, lastDayOff: false };
+
+function clamp() {
+  if (state.year === 2026 && state.month < 1)  { state.year = 2026; state.month = 1; }
+  if (state.year === 2027 && state.month > 12) { state.year = 2027; state.month = 12; }
+}
+
+function syncMonthPlan() {
+  const monthId = `${state.year}-${pad(state.month)}`;
+  const saved = workPlans[monthId] || {};
+  const maxDay = daysInMonth(state.year, state.month);
+  state.referenceDay = Math.min(Math.max(1, saved.referenceDay || defaultReferenceDay(state.year, state.month)), maxDay);
+  state.workedMinutes = Math.max(0, Number(saved.workedMinutes) || 0);
+  state.lastDayOff = Boolean(saved.lastDayOff);
+}
+
+function saveCurrentPlan() {
+  const monthId = `${state.year}-${pad(state.month)}`;
+  workPlans[monthId] = {
+    referenceDay: state.referenceDay,
+    workedMinutes: state.workedMinutes,
+    lastDayOff: state.lastDayOff,
+  };
+  saveWorkPlans(workPlans);
+}
+
+/* ===================================================
+   렌더링
+=================================================== */
+function render() {
+  const { year, month, referenceDay, workedMinutes, lastDayOff } = state;
+  const total       = daysInMonth(year, month);
+  const weekdayHolidays = weekdayHolidayCount(year, month);
+  const targetMinutes = getTargetMinutes(year, month);
+  const plan = getPlan(year, month, referenceDay, lastDayOff);
+  const remainingMinutes = Math.max(0, targetMinutes - workedMinutes);
+  const overtimeMinutes = Math.max(0, workedMinutes - targetMinutes);
+  const dailyRequired = plan.remainingDays.length ? remainingMinutes / plan.remainingDays.length : 0;
+  const remainingDaySet = new Set(plan.remainingDays.map(d => key(year, month, d)));
+
+  document.getElementById('s-target').textContent            = formatMinutes(targetMinutes);
+  document.getElementById('s-weekday-holidays').textContent  = weekdayHolidays;
+  document.getElementById('s-working').textContent           = plan.eligibleDays.length;
+  document.getElementById('s-remaining-days').textContent    = plan.remainingDays.length;
+  document.getElementById('s-remaining-hours').textContent   = formatMinutes(remainingMinutes);
+  document.getElementById('s-daily-required').textContent    = plan.remainingDays.length ? formatMinutes(dailyRequired) : '-';
+  document.getElementById('formula-note').textContent =
+    `계산식: ${Math.floor(total / 7)}주 × 40시간 + ${total % 7}일 × 5시간 42분 − 평일 공휴일 ${weekdayHolidays}일 × 8시간 = ${formatMinutes(targetMinutes)}`;
+
+  const plannedOffText = plan.plannedOffKey
+    ? ` ${month}월 ${Number(plan.plannedOffKey.slice(-2))}일은 마지막 근무일 휴무로 제외했습니다.`
+    : '';
+  const progressNote = document.getElementById('progress-note');
+  if (overtimeMinutes) {
+    progressNote.textContent = `기준일까지 입력한 누적 근무시간이 월 기준시간을 ${formatMinutes(overtimeMinutes)} 초과했습니다.${plannedOffText}`;
+  } else if (!plan.remainingDays.length && remainingMinutes) {
+    progressNote.textContent = `남은 근무 가능일이 없지만 ${formatMinutes(remainingMinutes)}이 남아 있습니다. 기준일 또는 휴무 설정을 확인해 주세요.`;
+  } else {
+    progressNote.textContent = `기준일까지 ${formatMinutes(workedMinutes)}을 근무했고, ${formatMinutes(remainingMinutes)}이 남았습니다. 남은 근무일마다 ${formatMinutes(dailyRequired)}씩 추가로 채우면 됩니다.${plannedOffText}`;
+  }
+
+  document.getElementById('cal-title').textContent  = `${year}년 ${month}월`;
+  document.getElementById('sel-year').value  = year;
+  document.getElementById('sel-month').value = month;
+  document.getElementById('inp-reference-day').max = total;
+  document.getElementById('inp-reference-day').value = referenceDay;
+  document.getElementById('inp-worked-hours').value = workedMinutes ? (workedMinutes / 60) : '';
+  document.getElementById('inp-last-day-off').checked = lastDayOff;
+
+  const tbody = document.getElementById('cal-body');
+  tbody.innerHTML = '';
+
+  const today      = new Date();
+  const isCurMonth = today.getFullYear() === year && today.getMonth()+1 === month;
+  const firstDow   = dow(year, month, 1);
+
+  let day = 1;
+  let row = newRow();
+
+  // 첫 주 빈 칸
+  for (let b = 0; b < firstDow; b++) row.appendChild(emptyTd());
+
+  while (day <= total) {
+    const w        = dow(year, month, day);
+    const official = isOfficial(year, month, day);
+    const custom   = isCustom(year, month, day);
+    const holiday  = official || custom;
+    const vacDay   = !holiday && w !== 0 && w !== 6 && isVacation(year, month, day);
+    const isLastDayOff = plan.plannedOffKey === key(year, month, day);
+    const hName    = getHolName(year, month, day);
+    const isWork   = isEligibleWorkday(year, month, day) && !isLastDayOff;
+    const isToday  = isCurMonth && today.getDate() === day;
+
+    let cls = 't-workday';
+    if (isLastDayOff)  cls = 't-last-day-off';
+    else if (vacDay)   cls = 't-vacation';
+    else if (custom)   cls = 't-custom';
+    else if (official) cls = 't-holiday';
+    else if (w === 0)  cls = 't-sun';
+    else if (w === 6)  cls = 't-sat';
+
+    if (isToday) cls += ' t-today';
+
+    const td = document.createElement('td');
+    td.className = cls;
+    td.dataset.day = day;
+
+    const dn = document.createElement('span');
+    dn.className = 'dn';
+    dn.textContent = day;
+    td.appendChild(dn);
+
+    if (hName || vacDay || isLastDayOff) {
+      const hn = document.createElement('span');
+      hn.className = 'hn';
+      hn.textContent = isLastDayOff ? '마지막 휴무' : (vacDay ? '휴가' : hName);
+      td.appendChild(hn);
+    }
+
+    if (isWork && remainingDaySet.has(key(year, month, day))) {
+      const hh = document.createElement('span');
+      hh.className = 'hh';
+      hh.textContent = formatMinutes(dailyRequired);
+      td.appendChild(hh);
+    }
+
+    const _day = day;
+    td.addEventListener('click', () => openModal(year, month, _day));
+    row.appendChild(td);
+
+    if (w === 6) { tbody.appendChild(row); row = newRow(); }
+    day++;
+  }
+
+  // 마지막 주 나머지 빈 칸
+  const lastDow = dow(year, month, total);
+  if (lastDow !== 6) {
+    for (let b = lastDow+1; b <= 6; b++) row.appendChild(emptyTd());
+    tbody.appendChild(row);
+  }
+
+  renderHolList(year, month, total);
+  renderVacList(year, month, total);
+}
+
+function newRow() { return document.createElement('tr'); }
+function emptyTd() {
+  const td = document.createElement('td');
+  td.className = 't-empty';
+  return td;
+}
+
+function renderHolList(y, m, total) {
+  document.getElementById('hol-list-title').textContent = `${m}월 공휴일`;
+  const listBody = document.getElementById('hol-list-body');
+
+  const list = [];
+  for (let d = 1; d <= total; d++) {
+    if (isHoliday(y,m,d)) {
+      list.push({ d, name: getHolName(y,m,d), type: getHolType(y,m,d), w: dow(y,m,d) });
+    }
+  }
+
+  if (!list.length) {
+    listBody.innerHTML = '<div class="no-holiday">이달의 공휴일이 없습니다.</div>';
+    return;
+  }
+
+  listBody.innerHTML = list.map(h => {
+    let badge = '';
+    if (h.type === 'temporary') badge = '<span class="badge badge-temp">임시공휴일</span>';
+    if (h.type === 'substitute') badge = '<span class="badge badge-sub">대체공휴일</span>';
+    if (h.type === 'custom')     badge = '<span class="badge badge-custom">지정공휴일</span>';
+
+    const dateClass = h.type === 'custom' ? 'hol-date custom-date' : 'hol-date';
+    const delBtn = h.type === 'custom'
+      ? `<button class="btn-del-custom" title="삭제" data-k="${state.year}-${pad(state.month)}-${pad(h.d)}">✕</button>`
+      : '';
+
+    return `<div class="hol-row">
+      <span class="${dateClass}">${m}월 ${h.d}일</span>
+      <span class="hol-dow">(${DOW_KO[h.w]})</span>
+      <span class="hol-name">${h.name}</span>
+      ${badge}${delBtn}
+    </div>`;
+  }).join('');
+
+  // 삭제 버튼 이벤트
+  listBody.querySelectorAll('.btn-del-custom').forEach(btn => {
+    btn.addEventListener('click', () => {
+      delete customHolidays[btn.dataset.k];
+      saveCustom(customHolidays);
+      render();
+    });
+  });
+}
+
+function renderVacList(y, m, total) {
+  const wrap  = document.getElementById('vac-list-wrap');
+  const title = document.getElementById('vac-list-title');
+  const body  = document.getElementById('vac-list-body');
+
+  const list = [];
+  for (let d = 1; d <= total; d++) {
+    if (isVacation(y,m,d)) list.push({ d, w: dow(y,m,d) });
+  }
+
+  if (!list.length) { wrap.style.display = 'none'; return; }
+
+  wrap.style.display = 'block';
+  title.textContent  = `${m}월 휴가`;
+  body.innerHTML = list.map(v => {
+    const k = key(y, m, v.d);
+    return `<div class="hol-row">
+      <span class="hol-date" style="color:#30d158">${m}월 ${v.d}일</span>
+      <span class="hol-dow">(${DOW_KO[v.w]})</span>
+      <span class="hol-name">🏖️ 휴가</span>
+      <button class="btn-del-custom" title="취소" data-k="${k}">✕</button>
+    </div>`;
+  }).join('');
+
+  body.querySelectorAll('.btn-del-custom').forEach(b => {
+    b.addEventListener('click', () => {
+      delete vacations[b.dataset.k];
+      saveVacations(vacations);
+      render();
+    });
+  });
+}
+
+/* ===================================================
+   모달
+=================================================== */
+const modal        = document.getElementById('modal');
+const modalDate    = document.getElementById('modal-date');
+const modalStatus  = document.getElementById('modal-status');
+const modalInpWrap = document.getElementById('modal-input-wrap');
+const modalInp     = document.getElementById('modal-inp');
+const modalBtns    = document.getElementById('modal-btns');
+const modalVacWrap = document.getElementById('modal-vac-wrap');
+const modalVacBtn  = document.getElementById('modal-vac-btn');
+
+let modalTarget = null; // { y, m, d, k }
+
+function openModal(y, m, d) {
+  const w = dow(y,m,d);
+  const k = key(y,m,d);
+  modalTarget = { y, m, d, k };
+
+  modalDate.textContent = `${y}년 ${m}월 ${d}일 (${DOW_KO[w]})`;
+
+  const official = isOfficial(y,m,d);
+  const custom   = isCustom(y,m,d);
+  const plannedOffKey = y === state.year && m === state.month
+    ? getPlan(y, m, state.referenceDay, state.lastDayOff).plannedOffKey
+    : null;
+
+  modalBtns.innerHTML = '';
+  modalVacWrap.style.display = 'none';
+
+  const cancelBtn = btn('취소', 'btn btn-cancel', closeModal);
+  modalBtns.appendChild(cancelBtn);
+
+  if (plannedOffKey === k) {
+    modalStatus.className = 'modal-status custom';
+    modalStatus.textContent = '🌙 마지막 근무일 휴무로 제외된 날입니다.';
+    modalInpWrap.style.display = 'none';
+    const cancelRestBtn = btn('휴무 옵션 해제', 'btn btn-remove', () => {
+      state.lastDayOff = false;
+      saveCurrentPlan();
+      closeModal();
+      render();
+    });
+    modalBtns.appendChild(cancelRestBtn);
+  } else if (official) {
+    // 법정 공휴일 → 정보 표시만
+    modalStatus.className = 'modal-status official';
+    modalStatus.textContent = `📅 법정 공휴일: ${getHolName(y,m,d)}`;
+    modalInpWrap.style.display = 'none';
+  } else if (custom) {
+    // 사용자 지정 → 해제 가능
+    modalStatus.className = 'modal-status custom';
+    modalStatus.textContent = `✏️ 지정 공휴일: ${customHolidays[k]}`;
+    modalInpWrap.style.display = 'none';
+    const removeBtn = btn('공휴일 해제', 'btn btn-remove', () => {
+      delete customHolidays[k];
+      saveCustom(customHolidays);
+      closeModal();
+      render();
+    });
+    modalBtns.appendChild(removeBtn);
+  } else if (isVacation(y,m,d)) {
+    // 휴가 등록된 날 → 취소 가능
+    modalStatus.className = 'modal-status vacation';
+    modalStatus.textContent = '🏖️ 휴가로 등록된 날입니다.';
+    modalInpWrap.style.display = 'none';
+    const removeBtn = btn('휴가 취소', 'btn btn-remove', () => {
+      delete vacations[k];
+      saveVacations(vacations);
+      closeModal();
+      render();
+    });
+    modalBtns.appendChild(removeBtn);
+  } else if (w === 0 || w === 6) {
+    // 주말
+    modalStatus.className = 'modal-status weekend';
+    modalStatus.textContent = `${w === 0 ? '일요일' : '토요일'}입니다.`;
+    modalInpWrap.style.display = 'none';
+  } else {
+    // 근무일 → 공휴일 지정 또는 휴가 등록 가능
+    modalStatus.className = 'modal-status workday';
+    modalStatus.textContent = '근무일입니다.';
+    modalInpWrap.style.display = 'block';
+    modalInp.value = '';
+    setTimeout(() => modalInp.focus(), 50);
+
+    const addBtn = btn('공휴일로 지정', 'btn btn-add', () => {
+      const name = modalInp.value.trim() || '지정 공휴일';
+      customHolidays[k] = name;
+      saveCustom(customHolidays);
+      closeModal();
+      render();
+    });
+    modalBtns.appendChild(addBtn);
+
+    modalVacWrap.style.display = 'block';
+    modalVacBtn.onclick = () => {
+      vacations[k] = true;
+      saveVacations(vacations);
+      closeModal();
+      render();
+    };
+  }
+
+  modal.classList.add('open');
+}
+
+function closeModal() { modal.classList.remove('open'); }
+
+function btn(text, cls, onClick) {
+  const el = document.createElement('button');
+  el.className = cls;
+  el.textContent = text;
+  el.addEventListener('click', onClick);
+  return el;
+}
+
+// 모달 외부 클릭 닫기
+modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+
+// Enter로 추가
+modalInp.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    const name = modalInp.value.trim() || '지정 공휴일';
+    if (modalTarget) {
+      customHolidays[modalTarget.k] = name;
+      saveCustom(customHolidays);
+      closeModal();
+      render();
+    }
+  }
+  if (e.key === 'Escape') closeModal();
+});
+
+/* ===================================================
+   이벤트
+=================================================== */
+document.getElementById('sel-year').addEventListener('change', e => {
+  state.year = parseInt(e.target.value);
+  syncMonthPlan();
+  render();
+});
+document.getElementById('sel-month').addEventListener('change', e => {
+  state.month = parseInt(e.target.value);
+  syncMonthPlan();
+  render();
+});
+document.getElementById('inp-reference-day').addEventListener('input', e => {
+  const maxDay = daysInMonth(state.year, state.month);
+  state.referenceDay = Math.min(Math.max(1, parseInt(e.target.value) || 1), maxDay);
+  saveCurrentPlan();
+  render();
+});
+document.getElementById('inp-worked-hours').addEventListener('input', e => {
+  state.workedMinutes = Math.max(0, Math.round((parseFloat(e.target.value) || 0) * 60));
+  saveCurrentPlan();
+  render();
+});
+document.getElementById('inp-last-day-off').addEventListener('change', e => {
+  state.lastDayOff = e.target.checked;
+  saveCurrentPlan();
+  render();
+});
+document.getElementById('btn-prev').addEventListener('click', () => {
+  state.month--;
+  if (state.month < 1) { state.month = 12; state.year--; }
+  clamp();
+  syncMonthPlan();
+  render();
+});
+document.getElementById('btn-next').addEventListener('click', () => {
+  state.month++;
+  if (state.month > 12) { state.month = 1; state.year++; }
+  clamp();
+  syncMonthPlan();
+  render();
+});
+
+/* ===================================================
+   초기화
+=================================================== */
+(function init() {
+  const sel = document.getElementById('sel-month');
+  for (let m = 1; m <= 12; m++) {
+    const opt = document.createElement('option');
+    opt.value = m;
+    opt.textContent = `${m}월`;
+    sel.appendChild(opt);
+  }
+
+  const now = new Date();
+  const y = now.getFullYear();
+  state.year  = (y === 2026 || y === 2027) ? y : 2026;
+  state.month = (y === 2026 || y === 2027) ? now.getMonth()+1 : 1;
+  syncMonthPlan();
+
+  render();
+})();
+</script>
+</body>
+</html>
