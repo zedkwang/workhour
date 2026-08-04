@@ -1011,10 +1011,16 @@ document.getElementById('inp-reference-day').addEventListener('input', e => {
   saveCurrentPlan();
   render();
 });
-document.getElementById('inp-worked-hours').addEventListener('input', e => {
+document.getElementById('inp-worked-hours').addEventListener('change', e => {
   state.workedMinutes = Math.max(0, Math.round((parseFloat(e.target.value) || 0) * 60));
   saveCurrentPlan();
   render();
+});
+document.getElementById('inp-worked-hours').addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    e.currentTarget.blur();
+  }
 });
 document.getElementById('inp-last-day-off').addEventListener('change', e => {
   state.lastDayOff = e.target.checked;
