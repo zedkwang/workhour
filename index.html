@@ -320,9 +320,9 @@
         <input type="number" id="inp-reference-day" min="1" max="31" step="1">
       </div>
       <div class="ctrl-group">
-        <label for="inp-worked-hours">기준일까지 누적 근무시간 (h)</label>
-        <input type="number" id="inp-worked-hours" min="0" max="744" step="0.25" placeholder="예: 82.5">
-        <span class="control-hint">오늘 근무한 시간까지 포함한 누적값을 입력해 주세요.</span>
+        <label for="inp-worked-hours">기준일까지 누적 근무시간 (시.분)</label>
+        <input type="number" id="inp-worked-hours" min="0" max="744" step="0.01" inputmode="decimal" placeholder="예: 43.50">
+        <span class="control-hint">시.분 형식입니다. 예: 43.5 = 43시간 50분</span>
       </div>
       <div class="ctrl-group toggle-group">
         <label class="toggle-label" for="inp-last-day-off">
@@ -498,6 +498,7 @@ const HOLIDAYS = {
 =================================================== */
 const CUSTOM_KEY = 'fanding-custom-holidays';
 const WORK_PLAN_KEY = 'fanding-work-plan';
+const WORK_PLAN_FORMAT_KEY = 'fanding-work-plan-format';
 
 function loadCustom() {
   try { return JSON.parse(localStorage.getItem(CUSTOM_KEY)) || {}; }
@@ -614,10 +615,51 @@ function formatMinutes(minutes) {
   return `${Math.floor(total / 60)}시간 ${String(total % 60).padStart(2, '0')}분`;
 }
 
+function parseWorkTime(value) {
+  const text = String(value).trim();
+  if (!text) return 0;
+
+  const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(text);
+  if (!match) return null;
+
+  const hours = Number(match[1]);
+  const minuteText = match[2] || '';
+  const minutes = minuteText.length === 1 ? Number(minuteText) * 10 : Number(minuteText || 0);
+  if (minutes > 59) return null;
+
+  return (hours * 60) + minutes;
+}
+
+function formatWorkTime(minutes) {
+  const total = Math.max(0, Math.round(minutes));
+  return `${Math.floor(total / 60)}.${String(total % 60).padStart(2, '0')}`;
+}
+
+function migrateWorkPlanFormat() {
+  if (localStorage.getItem(WORK_PLAN_FORMAT_KEY) === 'time-dot-minute-v2') return;
+
+  let changed = false;
+  Object.values(workPlans).forEach(plan => {
+    const legacyMinutes = Number(plan?.workedMinutes);
+    if (!Number.isFinite(legacyMinutes) || legacyMinutes <= 0) return;
+
+    const convertedMinutes = parseWorkTime(String(legacyMinutes / 60));
+    if (convertedMinutes !== null && convertedMinutes !== legacyMinutes) {
+      plan.workedMinutes = convertedMinutes;
+      changed = true;
+    }
+  });
+
+  if (changed) saveWorkPlans(workPlans);
+  localStorage.setItem(WORK_PLAN_FORMAT_KEY, 'time-dot-minute-v2');
+}
+
 function defaultReferenceDay(y,m) {
   const now = new Date();
   return now.getFullYear() === y && now.getMonth() + 1 === m ? now.getDate() : 1;
 }
+
+migrateWorkPlanFormat();
 
 /* ===================================================
    상태
@@ -694,7 +736,7 @@ function render() {
   document.getElementById('sel-month').value = month;
   document.getElementById('inp-reference-day').max = total;
   document.getElementById('inp-reference-day').value = referenceDay;
-  document.getElementById('inp-worked-hours').value = workedMinutes ? (workedMinutes / 60) : '';
+  document.getElementById('inp-worked-hours').value = workedMinutes ? formatWorkTime(workedMinutes) : '';
   document.getElementById('inp-last-day-off').checked = lastDayOff;
 
   const tbody = document.getElementById('cal-body');
@@ -1012,9 +1054,19 @@ document.getElementById('inp-reference-day').addEventListener('input', e => {
   render();
 });
 document.getElementById('inp-worked-hours').addEventListener('change', e => {
-  state.workedMinutes = Math.max(0, Math.round((parseFloat(e.target.value) || 0) * 60));
+  const minutes = parseWorkTime(e.target.value);
+  if (minutes === null) {
+    e.currentTarget.setCustomValidity('분은 00~59 범위로 입력해 주세요. 예: 43.50');
+    e.currentTarget.reportValidity();
+    return;
+  }
+  e.currentTarget.setCustomValidity('');
+  state.workedMinutes = minutes;
   saveCurrentPlan();
   render();
+});
+document.getElementById('inp-worked-hours').addEventListener('input', e => {
+  e.currentTarget.setCustomValidity('');
 });
 document.getElementById('inp-worked-hours').addEventListener('keydown', e => {
   if (e.key === 'Enter') {
