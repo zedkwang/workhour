@@ -357,7 +357,7 @@
       <div class="stat-box">
         <div class="stat-value" id="s-remaining-days">-</div>
         <div class="stat-unit">일</div>
-        <div class="stat-label">기준일 다음날부터<br>남은 근무일</div>
+        <div class="stat-label">남은 근무 가능일</div>
       </div>
       <div class="stat-box warning">
         <div class="stat-value stat-duration" id="s-remaining-hours">-</div>
@@ -367,7 +367,7 @@
       <div class="stat-box highlight">
         <div class="stat-value stat-duration" id="s-daily-required">-</div>
         <div class="stat-unit">시간</div>
-        <div class="stat-label">기준일 다음날부터<br>근무일당 추가 필요</div>
+        <div class="stat-label">남은 근무일당 추가 필요</div>
       </div>
     </div>
     <p class="formula-note" id="formula-note"></p>
@@ -397,7 +397,7 @@
       <div class="legend-item"><div class="lg-dot lg-custom"></div> 지정 공휴일</div>
       <div class="legend-item"><div class="lg-dot lg-sun"></div> 일요일</div>
       <div class="legend-item"><div class="lg-dot lg-sat"></div> 토요일</div>
-      <div class="legend-item" style="color:#007aff;font-weight:600;">🔵 기준일 다음날부터 근무일당 추가 필요</div>
+      <div class="legend-item" style="color:#007aff;font-weight:600;">🔵 남은 근무일당 추가 필요</div>
       <div class="legend-item"><div class="lg-dot lg-vacation"></div> 휴가</div>
       <div class="legend-item"><div class="lg-dot lg-last-day-off"></div> 마지막 근무일 휴무</div>
     </div>
@@ -598,7 +598,7 @@ function getPlan(y,m,referenceDay,lastDayOff) {
   for (let d = 1; d <= total; d++) {
     if (!isEligibleWorkday(y,m,d)) continue;
     eligibleDays.push(d);
-    if (d > referenceDay) remainingDays.push(d);
+    if (d >= referenceDay) remainingDays.push(d);
   }
 
   let plannedOffKey = null;
@@ -728,7 +728,7 @@ function render() {
   } else if (!plan.remainingDays.length && remainingMinutes) {
     progressNote.textContent = `${creditedDetails}을 반영했지만 남은 근무 가능일이 없고 ${formatMinutes(remainingMinutes)}이 남아 있습니다. 기준일 또는 휴무 설정을 확인해 주세요.`;
   } else {
-    progressNote.textContent = `${creditedDetails}을 반영했고, ${formatMinutes(remainingMinutes)}이 남았습니다. 기준일 다음 날부터 남은 근무일마다 ${formatMinutes(dailyRequired)}씩 추가로 채우면 됩니다.${plannedOffText}`;
+    progressNote.textContent = `${creditedDetails}을 반영했고, ${formatMinutes(remainingMinutes)}이 남았습니다. 남은 근무일마다 ${formatMinutes(dailyRequired)}씩 추가로 채우면 됩니다.${plannedOffText}`;
   }
 
   document.getElementById('cal-title').textContent  = `${year}년 ${month}월`;
