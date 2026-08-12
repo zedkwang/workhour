@@ -212,10 +212,15 @@
     td.t-vacation .dn { color: #30d158; font-weight: 700; }
     td.t-vacation .hn { color: #30d158; }
     .lg-vacation  { background: #1a2d1e; border: 1.5px solid #2a4d30; }
+    td.t-half-vacation { background: #152b2c; }
+    td.t-half-vacation .dn { color: #64d2ff; font-weight: 700; }
+    td.t-half-vacation .hn { color: #64d2ff; }
+    .lg-half-vacation { background: #152b2c; border: 1.5px solid #245259; }
     .modal-status.vacation { background: #1a2d1e; color: #30d158; }
     .stat-box.vacation .stat-value,
     .stat-box.vacation .stat-unit { color: #ff9f0a; }
     .btn-vacation { background: #30d158; color: #fff; }
+    .btn-half-vacation { background: #0a84ff; color: #fff; }
     .modal-vac-divider {
       text-align: center; font-size: 11px; color: #48484a;
       margin: 10px 0; padding-top: 12px; border-top: 1px solid #3a3a3c;
@@ -399,6 +404,7 @@
       <div class="legend-item"><div class="lg-dot lg-sat"></div> 토요일</div>
       <div class="legend-item" style="color:#007aff;font-weight:600;">🔵 남은 근무일당 추가 필요</div>
       <div class="legend-item"><div class="lg-dot lg-vacation"></div> 휴가</div>
+      <div class="legend-item"><div class="lg-dot lg-half-vacation"></div> 반차 (4시간 인정)</div>
       <div class="legend-item"><div class="lg-dot lg-last-day-off"></div> 마지막 근무일 휴무</div>
     </div>
     <div class="legend-hint">✏️ 날짜를 클릭하면 공휴일로 지정하거나 해제할 수 있습니다</div>
@@ -436,7 +442,10 @@
 
     <div id="modal-vac-wrap" style="display:none">
       <div class="modal-vac-divider">또는</div>
-      <button class="btn btn-vacation" id="modal-vac-btn" style="width:100%">🏖️ 휴가로 등록</button>
+      <div class="modal-btns">
+        <button class="btn btn-vacation" id="modal-vac-btn">🏖️ 전일 휴가</button>
+        <button class="btn btn-half-vacation" id="modal-half-vac-btn">🌤️ 반차</button>
+      </div>
     </div>
   </div>
 </div>
@@ -516,7 +525,7 @@ function loadVacations() {
   catch { return {}; }
 }
 function saveVacations(obj) { localStorage.setItem(VACATION_KEY, JSON.stringify(obj)); }
-let vacations = loadVacations(); // { 'YYYY-MM-DD': true, ... }
+let vacations = loadVacations(); // { 'YYYY-MM-DD': 'full' | 'half', ... }
 
 function loadWorkPlans() {
   try { return JSON.parse(localStorage.getItem(WORK_PLAN_KEY)) || {}; }
@@ -538,7 +547,12 @@ function dow(y,m,d)       { return new Date(y,m-1,d).getDay(); }
 function isOfficial(y,m,d) { return !!HOLIDAYS[key(y,m,d)]; }
 function isCustom(y,m,d)   { return !!customHolidays[key(y,m,d)]; }
 function isHoliday(y,m,d)  { return isOfficial(y,m,d) || isCustom(y,m,d); }
-function isVacation(y,m,d) { return !!vacations[key(y,m,d)]; }
+function getVacationType(y,m,d) {
+  const value = vacations[key(y,m,d)];
+  return value === 'half' ? 'half' : (value ? 'full' : '');
+}
+function isVacation(y,m,d) { return getVacationType(y,m,d) === 'full'; }
+function isHalfVacation(y,m,d) { return getVacationType(y,m,d) === 'half'; }
 
 function vacationCount(y,m) {
   const total = daysInMonth(y,m);
@@ -546,6 +560,16 @@ function vacationCount(y,m) {
   for (let d = 1; d <= total; d++) {
     const w = dow(y,m,d);
     if (isVacation(y,m,d) && w !== 0 && w !== 6 && !isHoliday(y,m,d)) cnt++;
+  }
+  return cnt;
+}
+
+function halfVacationCount(y,m) {
+  const total = daysInMonth(y,m);
+  let cnt = 0;
+  for (let d = 1; d <= total; d++) {
+    const w = dow(y,m,d);
+    if (isHalfVacation(y,m,d) && w !== 0 && w !== 6 && !isHoliday(y,m,d)) cnt++;
   }
   return cnt;
 }
@@ -700,7 +724,8 @@ function render() {
   const targetMinutes = getTargetMinutes(year, month);
   const plan = getPlan(year, month, referenceDay, lastDayOff);
   const vacationDays = vacationCount(year, month);
-  const vacationMinutes = vacationDays * 8 * 60;
+  const halfVacationDays = halfVacationCount(year, month);
+  const vacationMinutes = (vacationDays * 8 * 60) + (halfVacationDays * 4 * 60);
   const creditedMinutes = workedMinutes + vacationMinutes;
   const remainingMinutes = Math.max(0, targetMinutes - creditedMinutes);
   const overtimeMinutes = Math.max(0, creditedMinutes - targetMinutes);
@@ -719,8 +744,12 @@ function render() {
   const plannedOffText = plan.plannedOffKey
     ? ` ${month}월 ${Number(plan.plannedOffKey.slice(-2))}일은 마지막 근무일 휴무로 제외했습니다.`
     : '';
-  const creditedDetails = vacationDays
-    ? `직접 입력 ${formatMinutes(workedMinutes)} + 휴가 ${vacationDays}일(${formatMinutes(vacationMinutes)})`
+  const vacationDetails = [
+    vacationDays && `전일 휴가 ${vacationDays}일(${formatMinutes(vacationDays * 8 * 60)})`,
+    halfVacationDays && `반차 ${halfVacationDays}일(${formatMinutes(halfVacationDays * 4 * 60)})`,
+  ].filter(Boolean).join(' + ');
+  const creditedDetails = vacationDetails
+    ? `직접 입력 ${formatMinutes(workedMinutes)} + ${vacationDetails}`
     : `직접 입력 ${formatMinutes(workedMinutes)}`;
   const progressNote = document.getElementById('progress-note');
   if (overtimeMinutes) {
@@ -758,6 +787,7 @@ function render() {
     const custom   = isCustom(year, month, day);
     const holiday  = official || custom;
     const vacDay   = !holiday && w !== 0 && w !== 6 && isVacation(year, month, day);
+    const halfVacDay = !holiday && w !== 0 && w !== 6 && isHalfVacation(year, month, day);
     const isLastDayOff = plan.plannedOffKey === key(year, month, day);
     const hName    = getHolName(year, month, day);
     const isWork   = isEligibleWorkday(year, month, day) && !isLastDayOff;
@@ -766,6 +796,7 @@ function render() {
     let cls = 't-workday';
     if (isLastDayOff)  cls = 't-last-day-off';
     else if (vacDay)   cls = 't-vacation';
+    else if (halfVacDay) cls = 't-half-vacation';
     else if (custom)   cls = 't-custom';
     else if (official) cls = 't-holiday';
     else if (w === 0)  cls = 't-sun';
@@ -782,10 +813,10 @@ function render() {
     dn.textContent = day;
     td.appendChild(dn);
 
-    if (hName || vacDay || isLastDayOff) {
+    if (hName || vacDay || halfVacDay || isLastDayOff) {
       const hn = document.createElement('span');
       hn.className = 'hn';
-      hn.textContent = isLastDayOff ? '마지막 휴무' : (vacDay ? '휴가' : hName);
+      hn.textContent = isLastDayOff ? '마지막 휴무' : (vacDay ? '휴가' : (halfVacDay ? '반차' : hName));
       td.appendChild(hn);
     }
 
@@ -874,7 +905,8 @@ function renderVacList(y, m, total) {
 
   const list = [];
   for (let d = 1; d <= total; d++) {
-    if (isVacation(y,m,d)) list.push({ d, w: dow(y,m,d) });
+    const type = getVacationType(y,m,d);
+    if (type) list.push({ d, w: dow(y,m,d), type });
   }
 
   if (!list.length) { wrap.style.display = 'none'; return; }
@@ -884,9 +916,9 @@ function renderVacList(y, m, total) {
   body.innerHTML = list.map(v => {
     const k = key(y, m, v.d);
     return `<div class="hol-row">
-      <span class="hol-date" style="color:#30d158">${m}월 ${v.d}일</span>
+      <span class="hol-date" style="color:${v.type === 'half' ? '#64d2ff' : '#30d158'}">${m}월 ${v.d}일</span>
       <span class="hol-dow">(${DOW_KO[v.w]})</span>
-      <span class="hol-name">🏖️ 휴가</span>
+      <span class="hol-name">${v.type === 'half' ? '🌤️ 반차 · 4시간 인정' : '🏖️ 전일 휴가 · 8시간 인정'}</span>
       <button class="btn-del-custom" title="취소" data-k="${k}">✕</button>
     </div>`;
   }).join('');
@@ -911,6 +943,7 @@ const modalInp     = document.getElementById('modal-inp');
 const modalBtns    = document.getElementById('modal-btns');
 const modalVacWrap = document.getElementById('modal-vac-wrap');
 const modalVacBtn  = document.getElementById('modal-vac-btn');
+const modalHalfVacBtn = document.getElementById('modal-half-vac-btn');
 
 let modalTarget = null; // { y, m, d, k }
 
@@ -961,10 +994,13 @@ function openModal(y, m, d) {
       render();
     });
     modalBtns.appendChild(removeBtn);
-  } else if (isVacation(y,m,d)) {
+  } else if (getVacationType(y,m,d)) {
     // 휴가 등록된 날 → 취소 가능
     modalStatus.className = 'modal-status vacation';
-    modalStatus.textContent = '🏖️ 휴가로 등록된 날입니다.';
+    const vacationType = getVacationType(y,m,d);
+    modalStatus.textContent = vacationType === 'half'
+      ? '🌤️ 반차로 등록된 날입니다. 4시간이 인정됩니다.'
+      : '🏖️ 전일 휴가로 등록된 날입니다. 8시간이 인정됩니다.';
     modalInpWrap.style.display = 'none';
     const removeBtn = btn('휴가 취소', 'btn btn-remove', () => {
       delete vacations[k];
@@ -997,7 +1033,13 @@ function openModal(y, m, d) {
 
     modalVacWrap.style.display = 'block';
     modalVacBtn.onclick = () => {
-      vacations[k] = true;
+      vacations[k] = 'full';
+      saveVacations(vacations);
+      closeModal();
+      render();
+    };
+    modalHalfVacBtn.onclick = () => {
+      vacations[k] = 'half';
       saveVacations(vacations);
       closeModal();
       render();
